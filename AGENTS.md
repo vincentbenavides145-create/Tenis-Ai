@@ -38,3 +38,6 @@ Cuando el usuario pida analizar un partido de tenis o los partidos del día (por
 
 ## 🚀 Integración
 - Al terminar cualquier cambio de código, después de que pasen `python -m pytest` y las comprobaciones, **integrar siempre en `main`** (merge de la rama de trabajo y `git push origin main`).
+
+## 🚀 Integración en main (instrucción del usuario)
+- Todo cambio de código, una vez que pasan `pytest` y (si toca el modelo) `python backtest.py`, se integra **siempre** en `main` y se sube (`git push origin main`). Si el push es rechazado: `git pull --rebase origin main` y repetir.
