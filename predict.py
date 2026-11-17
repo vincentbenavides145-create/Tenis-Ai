@@ -17,10 +17,35 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
+try:  # .env opcional (API_TENNIS_KEY=...); las variables de entorno ya definidas tienen prioridad
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except ImportError:
+    pass
+
 from tenis_ai.engine import TennisEngine, parse_matchup  # noqa: E402
 from tenis_ai.players import PlayerNotFound  # noqa: E402
 
 GRAND_SLAMS = ("australian open", "roland garros", "french open", "wimbledon", "us open")
+
+
+def warn_data_age(engine: TennisEngine) -> None:
+    """Avisa si los datos con los que se predice están desactualizados."""
+    history_age = (date.today() - engine.history_end).days
+    if engine.data_end > engine.history_end:
+        if history_age > 45:
+            print(
+                f"ℹ️ Elo actualizado con api-tennis.com hasta el {engine.data_end.isoformat()}; las estadísticas "
+                f"de saque/resto del histórico terminan el {engine.history_end.isoformat()} ({history_age} días).\n",
+                file=sys.stderr,
+            )
+    elif engine.data_age_days > 45:
+        print(
+            f"⚠️ Los datos históricos terminan el {engine.data_end.isoformat()} "
+            f"({engine.data_age_days} días). La forma reciente de los jugadores no está incluida.\n",
+            file=sys.stderr,
+        )
 
 
 def run_today(engine: TennisEngine, day: str, default_surface: str) -> int:
@@ -32,7 +57,12 @@ def run_today(engine: TennisEngine, day: str, default_surface: str) -> int:
         if engine.data_age_days > 1:
             print(f"Actualizando Elo con resultados ATP desde {engine.data_end.isoformat()} (api-tennis.com)...", file=sys.stderr)
             added, issues = engine.update_from_api(client)
-            print(f"  {added} partidos añadidos; {len(issues)} con jugadores sin historial.\n", file=sys.stderr)
+            print(
+                f"  {added} partidos añadidos; {len(issues)} omitidos porque algún jugador no tiene "
+                "historial ATP (qualifiers o jugadores nuevos).\n",
+                file=sys.stderr,
+            )
+        warn_data_age(engine)
         fixtures = client.atp_singles_fixtures(day)
     except ApiTennisError as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -40,8 +70,15 @@ def run_today(engine: TennisEngine, day: str, default_surface: str) -> int:
     if not fixtures:
         print(f"No hay partidos ATP individuales el {day} en api-tennis.com.")
         return 0
-    print(f"Partidos ATP del {day}: {len(fixtures)}\n")
+    pending = [fx for fx in fixtures if fx.is_pending]
     for fx in fixtures:
+        if not fx.is_pending:
+            errors.append(
+                f"{fx.player_a} vs {fx.player_b}: no se analiza porque su estado en api-tennis.com es "
+                f"'{fx.status}' (ya empezó o no se juega); las cuotas ya no serían pre-partido."
+            )
+    print(f"Partidos ATP del {day}: {len(fixtures)} ({len(pending)} sin empezar)\n")
+    for fx in pending:
         surface = engine.guess_surface(fx.tournament)
         note = fx.tournament + (f" · {fx.round}" if fx.round else "") + (f" · {fx.time}" if fx.time else "")
         if surface is None:
@@ -72,14 +109,9 @@ def main() -> None:
     args = parser.parse_args()
 
     engine = TennisEngine()
-    if engine.data_age_days > 45:
-        print(
-            f"⚠️ Los datos históricos terminan el {engine.data_end.isoformat()} "
-            f"({engine.data_age_days} días). La forma reciente de los jugadores no está incluida.\n",
-            file=sys.stderr,
-        )
     if args.today:
         sys.exit(run_today(engine, args.date, args.surface))
+    warn_data_age(engine)
     if not args.query:
         parser.error("Indica un partido ('Alcaraz vs Sinner') o usa --today.")
     try:

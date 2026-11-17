@@ -140,3 +140,60 @@ def test_api_tennis_parsing(monkeypatch):
     assert len(fixtures) == 1 and fixtures[0].player_a == "C. Alcaraz"
     results = client.finished_atp_results("2026-11-16", "2026-11-16")
     assert results[0]["winner"] == "J. Sinner" and results[0]["sets"] == [(6, 4), (7, 6)]
+
+
+def _fake_response(monkeypatch, payload, status_code=200):
+    class Resp:
+        def __init__(self):
+            self.status_code = status_code
+
+        def json(self):
+            return payload
+
+    monkeypatch.setattr("tenis_ai.data.api_tennis.requests.get", lambda *a, **k: Resp())
+
+
+def test_api_tennis_error_message_is_readable(monkeypatch):
+    from tenis_ai.data.api_tennis import ApiTennisError
+
+    _fake_response(monkeypatch, {"error": "1", "result": [
+        {"param": "APIkey", "msg": "Wrong login credentials", "cod": 1004}]})
+    with pytest.raises(ApiTennisError, match="Wrong login credentials"):
+        ApiTennisClient(api_key="x").atp_singles_fixtures("2026-11-17")
+
+
+def test_api_tennis_key_alias(monkeypatch):
+    monkeypatch.delenv("API_TENNIS_KEY", raising=False)
+    monkeypatch.setenv("API_TENIS_KEY", "alias")
+    assert ApiTennisClient().api_key == "alias"
+
+
+def test_fixture_pending_status(monkeypatch):
+    rows = [{"event_key": k, "event_type_type": "Atp Singles", "event_first_player": "A", "event_second_player": "B",
+             "event_status": st} for k, st in enumerate(["", "Set 1", "Finished", "Cancelled"])]
+    _fake_response(monkeypatch, {"success": 1, "result": rows})
+    fixtures = ApiTennisClient(api_key="x").atp_singles_fixtures("2026-11-17")
+    assert [f.is_pending for f in fixtures] == [True, False, False, False]
+
+
+def test_resolve_player_apostrophe_and_abbreviation():
+    from types import SimpleNamespace
+
+    players = {
+        1: SimpleNamespace(name="Christopher Oconnell", last_date="20260330", matches=159),
+        2: SimpleNamespace(name="Darwin Blanch", last_date="20260318", matches=7),
+        3: SimpleNamespace(name="Ulises Blanch", last_date="20200831", matches=1),
+    }
+    ratings = SimpleNamespace(players=players)
+    assert resolve_player(ratings, "C. O'Connell") == 1
+    assert resolve_player(ratings, "Dar. Blanch") == 2
+    assert resolve_player(ratings, "U. Blanch") == 3
+
+
+def test_guess_surface_tour_finals_alias():
+    from tenis_ai.engine import TennisEngine
+
+    engine = TennisEngine.__new__(TennisEngine)
+    engine.surfaces = {"tour finals": "Hard", "davis finals rr ita vs arg": "Clay"}
+    assert engine.guess_surface("Finals - Turin") == "Hard"
+    assert engine.guess_surface("Unknown Finals Event") is None

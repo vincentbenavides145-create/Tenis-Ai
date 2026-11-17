@@ -14,7 +14,8 @@ class PlayerNotFound(ValueError):
 
 def normalize(name: str) -> str:
     text = unicodedata.normalize("NFKD", name or "").encode("ascii", "ignore").decode().lower()
-    return re.sub(r"[^a-z ]+", " ", text.replace("-", " ")).strip()
+    text = re.sub(r"['`´]", "", text)  # O'Connell -> oconnell (como en el histórico)
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z ]+", " ", text.replace("-", " "))).strip()
 
 
 def resolve_player(ratings: RatingSystem, query: str) -> int:
@@ -23,6 +24,8 @@ def resolve_player(ratings: RatingSystem, query: str) -> int:
     if not q:
         raise PlayerNotFound("Nombre vacío.")
     tokens = q.split()
+    # Abreviaturas con punto ("C.", "Dar.", "J. P.") son iniciales/prefijos del nombre, no apellidos.
+    abbreviations = {normalize(t) for t in query.split() if t.endswith(".")}
     exact, by_last, by_initial = [], [], []
     for pid, st in ratings.players.items():
         name = normalize(st.name)
@@ -35,8 +38,8 @@ def resolve_player(ratings: RatingSystem, query: str) -> int:
             by_last.append(pid)
         elif len(tokens) >= 2:
             # "c alcaraz" / "alcaraz c" / "carlos alcaraz garfia"
-            surname = [t for t in tokens if len(t) > 1]
-            initials = [t for t in tokens if len(t) == 1]
+            surname = [t for t in tokens if len(t) > 1 and t not in abbreviations]
+            initials = [t for t in tokens if len(t) == 1 or t in abbreviations]
             if surname and all(s in parts for s in surname):
                 if not initials or any(p.startswith(initials[0]) for p in parts if p not in surname):
                     by_initial.append(pid)

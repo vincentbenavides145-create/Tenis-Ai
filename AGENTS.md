@@ -25,5 +25,5 @@ Cuando el usuario pida analizar un partido de tenis o los partidos del día (por
 7. Categorías vacías no se muestran.
 
 ## 🧪 Validación
-- Cambios en el modelo: ejecutar `pytest` y `python backtest.py` y comparar Brier/log-loss del ganador y la calibración de lo mostrado.
+- Cambios en el modelo: ejecutar `python -m pytest` y `python backtest.py` y comparar Brier/log-loss del ganador y la calibración de lo mostrado.
 - Los parámetros se ajustan con `python backtest.py --fit --save-params` (ajuste 2016–2023, evaluación fuera de muestra 2024+).

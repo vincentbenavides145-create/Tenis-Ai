@@ -1,7 +1,7 @@
 """Conector de api-tennis.com: calendario del día y cuotas pre-partido (ATP individual).
 
-La clave se lee de la variable de entorno API_TENNIS_KEY (api-tennis.com la recibe
-en la URL como `APIkey`). Formatos de respuesta según la documentación pública;
+La clave se lee de la variable de entorno API_TENNIS_KEY (también se acepta la
+variante API_TENIS_KEY); api-tennis.com la recibe en la URL como `APIkey`. Formatos de respuesta según la documentación pública;
 el parseo es defensivo y las incidencias se informan en lugar de inventar datos.
 """
 
@@ -14,6 +14,39 @@ from typing import Any
 import requests
 
 BASE_URL = "https://api.api-tennis.com/tennis/"
+KEY_ENV_VARS = ("API_TENNIS_KEY", "API_TENIS_KEY")
+# Estados de api-tennis.com de un partido que todavía no ha empezado.
+PENDING_STATUSES = ("", "not started", "ns", "scheduled")
+
+
+def read_api_key() -> str:
+    for name in KEY_ENV_VARS:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _api_error_message(payload: Any) -> str:
+    """Texto legible de un error de api-tennis.com.
+
+    La API responde HTTP 200 con {"error": "1", "result": [{"msg": ..., "cod": ...}]}.
+    """
+    if not isinstance(payload, dict):
+        return str(payload)[:200]
+    messages = []
+    result = payload.get("result")
+    if isinstance(result, list):
+        for item in result:
+            if isinstance(item, dict) and item.get("msg"):
+                text = str(item["msg"]) + (f" (código {item['cod']})" if item.get("cod") is not None else "")
+                if text not in messages:
+                    messages.append(text)
+    for key in ("message", "error"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip() and value.strip() not in ("0", "1") and value not in messages:
+            messages.append(value.strip())
+    return "; ".join(messages) or "respuesta sin detalle del error"
 
 
 class ApiTennisError(RuntimeError):
@@ -33,10 +66,15 @@ class Fixture:
     status: str
     odds: dict[str, float] = field(default_factory=dict)
 
+    @property
+    def is_pending(self) -> bool:
+        """True si el partido aún no ha empezado (ni en juego, ni terminado, ni cancelado)."""
+        return self.status.strip().lower() in PENDING_STATUSES
+
 
 class ApiTennisClient:
     def __init__(self, api_key: str | None = None, timeout: float = 30.0) -> None:
-        self.api_key = api_key or os.getenv("API_TENNIS_KEY", "").strip()
+        self.api_key = api_key or read_api_key()
         if not self.api_key:
             raise ApiTennisError("Falta API_TENNIS_KEY (variable de entorno con la clave de api-tennis.com).")
         self.timeout = timeout
@@ -51,9 +89,14 @@ class ApiTennisClient:
             payload = response.json()
         except ValueError as exc:
             raise ApiTennisError(f"Respuesta no válida de api-tennis.com (HTTP {response.status_code}).") from exc
-        if response.status_code >= 400 or str(payload.get("success")) not in ("1", "True", "true"):
-            message = payload.get("error") or payload.get("message") or payload
-            raise ApiTennisError(f"api-tennis.com rechazó '{method}': {message}")
+        if (
+            response.status_code >= 400
+            or not isinstance(payload, dict)
+            or str(payload.get("success")) not in ("1", "True", "true")
+        ):
+            raise ApiTennisError(
+                f"api-tennis.com rechazó '{method}' (HTTP {response.status_code}): {_api_error_message(payload)}"
+            )
         return payload.get("result")
 
     def atp_singles_fixtures(self, day: str) -> list[Fixture]:

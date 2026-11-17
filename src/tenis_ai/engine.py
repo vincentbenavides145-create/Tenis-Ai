@@ -17,6 +17,17 @@ from .ratings import RatingSystem
 from .selection import select_markets, top_pick
 
 
+# Nombres de api-tennis.com que no coinciden con los del histórico de Sackmann.
+TOURNAMENT_ALIASES = {
+    "finals turin": "tour finals",
+    "finals london": "tour finals",
+    "nitto finals": "tour finals",
+    "finals": "tour finals",
+    "next gen finals jeddah": "next gen finals",
+    "next gen finals milan": "next gen finals",
+}
+
+
 @dataclass
 class Report:
     prediction: MatchPrediction
@@ -35,6 +46,8 @@ class TennisEngine:
         self.surfaces = latest_surface_by_tournament(self.matches)
         last = self.matches[-1].date if self.matches else "19700101"
         self.data_end = date(int(last[:4]), int(last[4:6]), int(last[6:8]))
+        # Fin del histórico con estadísticas de saque (no cambia al actualizar el Elo por la API).
+        self.history_end = self.data_end
 
     @property
     def data_age_days(self) -> int:
@@ -89,10 +102,13 @@ class TennisEngine:
 
     def guess_surface(self, tournament: str) -> str | None:
         key = normalize_tournament(tournament)
+        key = TOURNAMENT_ALIASES.get(key, key)
         if key in self.surfaces:
             return self.surfaces[key]
         for name, surface in self.surfaces.items():
-            if name and (name in key or key in name):
+            if not name or name.startswith("davis "):  # eliminatorias de Copa Davis, no torneos
+                continue
+            if name in key or key in name:
                 return surface
         return None
 
