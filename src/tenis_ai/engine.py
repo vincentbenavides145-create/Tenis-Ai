@@ -17,6 +17,16 @@ from .ratings import RatingSystem
 from .selection import select_markets, top_pick
 
 
+# Torneos cuyo nombre en api-tennis.com no coincide con el del historial.
+SURFACE_ALIASES = {
+    "finals turin": "Hard",
+    "next gen": "Hard",
+    "united": "Hard",
+    "davis": "Hard",
+    "laver": "Hard",
+}
+
+
 @dataclass
 class Report:
     prediction: MatchPrediction
@@ -89,6 +99,9 @@ class TennisEngine:
 
     def guess_surface(self, tournament: str) -> str | None:
         key = normalize_tournament(tournament)
+        for alias, surface in SURFACE_ALIASES.items():
+            if alias in key:
+                return surface
         if key in self.surfaces:
             return self.surfaces[key]
         for name, surface in self.surfaces.items():

@@ -31,12 +31,20 @@ class Fixture:
     round: str
     event_type: str
     status: str
+    live: bool = False
     odds: dict[str, float] = field(default_factory=dict)
+
+    @property
+    def started(self) -> bool:
+        """True si el partido ya está en juego o terminado (las cuotas ya no son pre-partido)."""
+        return self.live or self.status.strip() not in ("", "Not Started")
 
 
 class ApiTennisClient:
     def __init__(self, api_key: str | None = None, timeout: float = 30.0) -> None:
-        self.api_key = api_key or os.getenv("API_TENNIS_KEY", "").strip()
+        self.api_key = (
+            api_key or os.getenv("API_TENNIS_KEY", "").strip() or os.getenv("API_TENIS_KEY", "").strip()
+        )
         if not self.api_key:
             raise ApiTennisError("Falta API_TENNIS_KEY (variable de entorno con la clave de api-tennis.com).")
         self.timeout = timeout
@@ -52,7 +60,12 @@ class ApiTennisClient:
         except ValueError as exc:
             raise ApiTennisError(f"Respuesta no válida de api-tennis.com (HTTP {response.status_code}).") from exc
         if response.status_code >= 400 or str(payload.get("success")) not in ("1", "True", "true"):
-            message = payload.get("error") or payload.get("message") or payload
+            # Formato de error real: {"error": "1", "result": [{"msg": "Wrong login credentials", ...}]}
+            details = payload.get("result")
+            if isinstance(details, list) and details and isinstance(details[0], dict):
+                message = "; ".join(str(d.get("msg")) for d in details if d.get("msg"))
+            else:
+                message = payload.get("message") or payload.get("error") or "error desconocido"
             raise ApiTennisError(f"api-tennis.com rechazó '{method}': {message}")
         return payload.get("result")
 
@@ -75,6 +88,7 @@ class ApiTennisClient:
                     round=str(row.get("tournament_round") or ""),
                     event_type=event_type,
                     status=str(row.get("event_status") or ""),
+                    live=str(row.get("event_live") or "0") == "1",
                 )
             )
         return fixtures

@@ -33,15 +33,25 @@ def run_today(engine: TennisEngine, day: str, default_surface: str) -> int:
             print(f"Actualizando Elo con resultados ATP desde {engine.data_end.isoformat()} (api-tennis.com)...", file=sys.stderr)
             added, issues = engine.update_from_api(client)
             print(f"  {added} partidos añadidos; {len(issues)} con jugadores sin historial.\n", file=sys.stderr)
+        else:
+            issues = []
         fixtures = client.atp_singles_fixtures(day)
     except ApiTennisError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
+    if issues:
+        errors.append(f"{len(issues)} resultados recientes con jugadores sin historial ATP (no actualizan el Elo).")
     if not fixtures:
         print(f"No hay partidos ATP individuales el {day} en api-tennis.com.")
         return 0
     print(f"Partidos ATP del {day}: {len(fixtures)}\n")
     for fx in fixtures:
+        if fx.started:
+            errors.append(
+                f"{fx.player_a} vs {fx.player_b}: ya está en juego o terminado ({fx.status}); "
+                "no se analiza porque la predicción y las cuotas serían de antes del partido."
+            )
+            continue
         surface = engine.guess_surface(fx.tournament)
         note = fx.tournament + (f" · {fx.round}" if fx.round else "") + (f" · {fx.time}" if fx.time else "")
         if surface is None:

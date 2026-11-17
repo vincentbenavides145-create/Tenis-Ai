@@ -140,3 +140,36 @@ def test_api_tennis_parsing(monkeypatch):
     assert len(fixtures) == 1 and fixtures[0].player_a == "C. Alcaraz"
     results = client.finished_atp_results("2026-11-16", "2026-11-16")
     assert results[0]["winner"] == "J. Sinner" and results[0]["sets"] == [(6, 4), (7, 6)]
+
+
+def test_api_tennis_error_message_and_started(monkeypatch):
+    error_payload = {"error": "1", "result": [{"param": "APIkey", "msg": "Wrong login credentials", "cod": 1004}]}
+    live_payload = {"success": 1, "result": [
+        {"event_key": 5, "event_first_player": "A. Fils", "event_second_player": "R. Jodar",
+         "tournament_name": "Finals - Turin", "event_type_type": "Atp Singles", "event_status": "Set 1", "event_live": "1"},
+        {"event_key": 6, "event_first_player": "A. Zverev", "event_second_player": "B. Shelton",
+         "tournament_name": "Finals - Turin", "event_type_type": "Atp Singles", "event_status": "", "event_live": "0"},
+    ]}
+    current = {"payload": error_payload}
+
+    class Resp:
+        status_code = 200
+
+        def json(self):
+            return current["payload"]
+
+    monkeypatch.setattr("tenis_ai.data.api_tennis.requests.get", lambda *a, **k: Resp())
+    from tenis_ai.data.api_tennis import ApiTennisError
+
+    client = ApiTennisClient(api_key="x")
+    with pytest.raises(ApiTennisError, match="Wrong login credentials"):
+        client.atp_singles_fixtures("2026-11-17")
+    current["payload"] = live_payload
+    started = [f.started for f in client.atp_singles_fixtures("2026-11-17")]
+    assert started == [True, False]
+
+
+def test_api_key_alternative_name(monkeypatch):
+    monkeypatch.delenv("API_TENNIS_KEY", raising=False)
+    monkeypatch.setenv("API_TENIS_KEY", "abc")
+    assert ApiTennisClient().api_key == "abc"
