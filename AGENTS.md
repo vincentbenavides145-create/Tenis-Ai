@@ -27,3 +27,6 @@ Cuando el usuario pida analizar un partido de tenis o los partidos del día (por
 ## 🧪 Validación
 - Cambios en el modelo: ejecutar `python -m pytest` y `python backtest.py` y comparar Brier/log-loss del ganador y la calibración de lo mostrado.
 - Los parámetros se ajustan con `python backtest.py --fit --save-params` (ajuste 2016–2023, evaluación fuera de muestra 2024+).
+
+## 🚀 Integración
+- Al terminar cualquier cambio de código, después de que pasen `python -m pytest` y las comprobaciones, **integrar siempre en `main`** (merge de la rama de trabajo y `git push origin main`).
