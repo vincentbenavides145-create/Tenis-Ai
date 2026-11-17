@@ -1,5 +1,5 @@
 # 📊 Backtest walk-forward — Tenis-AI (ATP)
-**Fecha:** 2026-11-17 13:48 UTC
+**Fecha:** 2026-11-17 14:41 UTC
 **Periodo evaluado:** 20240101 – 20260525 · **partidos:** 5853
 
 ## Parámetros
@@ -39,6 +39,9 @@
 | total_games | 5853 | 77.3% | 77.2% | -0.0 |
 | total_sets | 3153 | 68.3% | 70.9% | +2.6 |
 | winner | 3363 | 70.2% | 70.7% | +0.4 |
+
+## 2b. Mejores predicciones (mercados fiables, máx. 4 por partido)
+- Selecciones: 23203 · prob. media 83.8% · acierto real 83.0% · diferencia **-0.9 pts** · Brier 0.1409
 
 ## 3. Todos los mercados (calibración global)
 | Tramo | Muestra | Prob. media | Acierto real |

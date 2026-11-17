@@ -19,7 +19,7 @@ from .markets import actual_outcomes, build_candidates, settle
 from .model import blended_probability, predict_match
 from .params import TennisParams
 from .ratings import RatingSystem
-from .selection import select_markets
+from .selection import best_predictions, select_markets
 
 EVAL_LEVELS = {"G", "M", "A", "F"}
 SHOWN_BINS = [0.60, 0.65, 0.70, 0.75, 0.80, 0.88]
@@ -126,6 +126,7 @@ class BacktestResult:
                 "brier_serve_return_only": round(brier_score(self.sr_only, o), 4),
             }
         out["shown"] = summarize([r for r in self.records if r["shown"]], SHOWN_BINS)
+        out["best"] = summarize([r for r in self.records if r.get("best")], SHOWN_BINS)
         out["all"] = summarize(self.records, [i / 10 for i in range(11)])
         return out
 
@@ -138,7 +139,9 @@ def run_backtest(
     min_matches: int = 10,
     full_markets: bool = True,
     progress: Callable[[int], None] | None = None,
+    gaps: dict[str, float] | None = None,
 ) -> BacktestResult:
+    gaps = {} if gaps is None else gaps
     ratings = RatingSystem(params)
     result = BacktestResult()
     for match in matches:
@@ -157,7 +160,9 @@ def run_backtest(
                 outcome = actual_outcomes(match, a_win)
                 if outcome is not None:
                     candidates = build_candidates(pred)
-                    shown_ids = {c["id"] for c in select_markets(candidates)}
+                    shown = select_markets(candidates)
+                    shown_ids = {c["id"] for c in shown}
+                    best_ids = {c["id"] for c in best_predictions(shown, gaps)}
                     for cand in candidates:
                         won = settle(cand, outcome)
                         if won is None:
@@ -169,6 +174,7 @@ def run_backtest(
                                 "probability": cand["probability"],
                                 "won": won,
                                 "shown": cand["id"] in shown_ids,
+                                "best": cand["id"] in best_ids,
                             }
                         )
             if progress and result.evaluated % 500 == 0:

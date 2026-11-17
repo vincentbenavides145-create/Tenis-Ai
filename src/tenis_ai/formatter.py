@@ -45,6 +45,7 @@ def format_report(
     pick: dict[str, Any] | None,
     data_age_days: int | None = None,
     header_note: str = "",
+    best: list[dict[str, Any]] | None = None,
 ) -> str:
     d = pred.dist
     level, detail = confidence(pred, data_age_days)
@@ -57,6 +58,11 @@ def format_report(
     ]
     if pick:
         lines += ["### ⭐ PICK RECOMENDADO POR EL MODELO (AI Top Pick)", *_line(pick), ""]
+    if best:
+        lines.append("### 🏅 MEJORES PREDICCIONES DEL PARTIDO")
+        for item in best:
+            lines += _line(item)
+        lines.append("")
     for category, header in HEADERS:
         items = [i for i in selected if i["category"] == category]
         if not items:

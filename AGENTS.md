@@ -29,9 +29,11 @@ Cuando el usuario pida analizar un partido de tenis o los partidos del día (por
 5. Sin tablas, sin "mercados a evitar", sin variables internas del modelo, sin etiquetas de nivel.
 6. Una justificación de **una sola línea** por selección, empezando con *Porque ...*.
 7. Categorías vacías no se muestran.
+8. **Mejores predicciones del partido** (máx. 4): de lo ya seleccionado, solo los mercados más fiables del backtest (quiebres totales y de cada jugador, tie-break en el 1er set, juegos de cada jugador, del 1er set y totales), ordenados por probabilidad corregida con su acierto histórico (`market_reliability.json`). Sin cuotas, el Pick Recomendado es la primera de ellas.
 
 ## 🧪 Validación
 - Cambios en el modelo: ejecutar `python -m pytest` y `python backtest.py` y comparar Brier/log-loss del ganador y la calibración de lo mostrado.
+- La fiabilidad por mercado se recalcula con `python backtest.py --save-reliability`.
 - Los parámetros se ajustan con `python backtest.py --fit --save-params` (ajuste 2016–2023, evaluación fuera de muestra 2024+).
 
 ## 🚀 Integración
