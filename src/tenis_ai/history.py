@@ -67,6 +67,7 @@ class HistoryStore:
         pred = report.prediction
         key = event_key or f"{match_date}_{pred.player_a}_{pred.player_b}"
         pick_id = report.pick["id"] if report.pick else None
+        best_ids = {s["id"] for s in getattr(report, "best", None) or []}
         record = {
             "key": key,
             "event_key": event_key,
@@ -89,6 +90,7 @@ class HistoryStore:
                     "odds": s.get("odds"),
                     "edge": s.get("edge"),
                     "top_pick": s["id"] == pick_id,
+                    "best": s["id"] in best_ids,
                     "settle": _jsonable_rule(s["settle"]),
                     "won": None,
                 }
@@ -181,6 +183,9 @@ class HistoryStore:
         picks = [s for s in sels if s.get("top_pick")]
         if picks:
             lines.append(f"**Picks recomendados:** {block(picks)}")
+        best = [s for s in sels if s.get("best")]
+        if best:
+            lines.append(f"**Mejores predicciones:** {block(best)}")
         lines += ["", "**Por categoría**"]
         by_cat: dict[str, list] = defaultdict(list)
         for s in sels:

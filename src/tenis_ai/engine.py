@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
 
@@ -14,7 +14,7 @@ from .model import MatchPrediction, predict_match
 from .params import TennisParams, load_params
 from .players import resolve_player
 from .ratings import RatingSystem
-from .selection import select_markets, top_pick
+from .selection import best_predictions, select_markets, top_pick
 
 
 # Torneos cuyo nombre en api-tennis.com no coincide con el del historial.
@@ -33,6 +33,7 @@ class Report:
     selected: list[dict[str, Any]]
     pick: dict[str, Any] | None
     markdown: str
+    best: list[dict[str, Any]] = field(default_factory=list)
 
 
 class TennisEngine:
@@ -124,9 +125,10 @@ class TennisEngine:
         pred = predict_match(self.ratings, a, b, surface, best_of)
         candidates = build_candidates(pred)
         selected = select_markets(candidates, odds=odds)
-        pick = top_pick(selected)
-        markdown = format_report(pred, selected, pick, self.data_age_days, header_note)
-        return Report(pred, selected, pick, markdown)
+        best = best_predictions(selected)
+        pick = top_pick(selected, best)
+        markdown = format_report(pred, selected, pick, self.data_age_days, header_note, best)
+        return Report(pred, selected, pick, markdown, best)
 
 
 def parse_matchup(text: str) -> tuple[str, str]:

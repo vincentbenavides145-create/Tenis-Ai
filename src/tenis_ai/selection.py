@@ -5,10 +5,13 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
+from .reliability import load_reliability, reliability_score
+
 MINIMUM_PROBABILITY = 0.60
 MAXIMUM_PROBABILITY = 0.88
 MIN_EDGE = 0.03  # EV mínimo (+3 %) cuando hay cuota
 MAX_PER_CATEGORY = 4
+MAX_BEST = 4  # tamaño de "Mejores predicciones"
 
 
 def expected_value(probability: float, price: float) -> float:
@@ -62,10 +65,31 @@ def select_markets(
     return selected
 
 
-def top_pick(selected: list[dict[str, Any]]) -> dict[str, Any] | None:
+def best_predictions(
+    selected: list[dict[str, Any]],
+    gaps: dict[str, float] | None = None,
+    limit: int = MAX_BEST,
+) -> list[dict[str, Any]]:
+    """Las selecciones (ya filtradas por las reglas) de los mercados más fiables del
+    backtest, ordenadas por probabilidad corregida con su acierto histórico."""
+    gaps = load_reliability() if gaps is None else gaps
+    scored = [(reliability_score(i, gaps), i) for i in selected]
+    scored = [(s, i) for s, i in scored if s is not None]
+    scored.sort(key=lambda si: (-si[0], -si[1]["probability"]))
+    return [i for _, i in scored[:limit]]
+
+
+def top_pick(
+    selected: list[dict[str, Any]],
+    best: list[dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    """Con cuotas: la de mayor EV. Sin cuotas: la primera de las mejores predicciones
+    (mercado fiable); si no hay ninguna, la más probable."""
     if not selected:
         return None
     priced = [i for i in selected if i.get("edge") is not None]
     if priced:
         return max(priced, key=lambda i: (i["edge"], i["probability"]))
+    if best:
+        return best[0]
     return max(selected, key=lambda i: i["probability"])

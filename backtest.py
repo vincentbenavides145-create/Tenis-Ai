@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 from tenis_ai.backtesting import games_objective, run_backtest, winner_objective  # noqa: E402
 from tenis_ai.data.sackmann import load_matches  # noqa: E402
+from tenis_ai.reliability import compute_reliability, load_reliability, save_reliability  # noqa: E402
 from tenis_ai.params import DEFAULT_PARAMS, FORM_SD_GRID, fit_params, load_params, save_params  # noqa: E402
 
 
@@ -60,6 +61,14 @@ def format_report(summary: dict, params, eval_from: str, eval_to: str, fit_info:
             f"| {g} | {b['count']} | {_pct(b['mean_predicted'])} | {_pct(b['hit_rate'])} | {b['gap'] * 100:+.1f} |"
             for g, b in shown["by_group"].items()
         ]
+    best = summary.get("best", {})
+    if best.get("count"):
+        lines += [
+            "",
+            "## 2b. Mejores predicciones (mercados fiables, máx. 4 por partido)",
+            f"- Selecciones: {best['count']} · prob. media {_pct(best['mean_predicted'])} · acierto real "
+            f"{_pct(best['hit_rate'])} · diferencia **{best['gap'] * 100:+.1f} pts** · Brier {best['brier']}",
+        ]
     lines += ["", "## 3. Todos los mercados (calibración global)", "| Tramo | Muestra | Prob. media | Acierto real |", "|---|:---:|:---:|:---:|"]
     lines += [f"| {c['bin']} | {c['count']} | {_pct(c['predicted'])} | {_pct(c['observed'])} |" for c in summary["all"].get("calibration", [])]
     return "\n".join(lines)
@@ -74,6 +83,8 @@ def main() -> None:
     parser.add_argument("--eval-from", default="20240101")
     parser.add_argument("--eval-to", default="20991231")
     parser.add_argument("--save-params", action="store_true", help="Guarda los parámetros ajustados en model_params.json")
+    parser.add_argument("--save-reliability", action="store_true",
+                        help="Guarda la fiabilidad por familia de mercado en market_reliability.json")
     parser.add_argument("--output", default="", help="Guarda el informe en Markdown")
     parser.add_argument("--json", default="", help="Guarda el resumen en JSON")
     args = parser.parse_args()
@@ -99,8 +110,15 @@ def main() -> None:
             print(f"Parámetros guardados en {save_params(params)}")
 
     print(f"Backtest {args.eval_from}–{args.eval_to} (todos los mercados)...")
-    result = run_backtest(matches, params, args.eval_from, args.eval_to, progress=lambda n: print(f"  {n} partidos"))
+    result = run_backtest(
+        matches, params, args.eval_from, args.eval_to,
+        progress=lambda n: print(f"  {n} partidos"), gaps=load_reliability(),
+    )
     summary = result.summary()
+    if args.save_reliability and summary["shown"].get("by_group"):
+        families = compute_reliability(summary["shown"]["by_group"])
+        period = f"{args.eval_from}-{min(args.eval_to, matches[-1].date)}"
+        print(f"Fiabilidad por mercado guardada en {save_reliability(families, period)}")
     report = format_report(summary, params, args.eval_from, min(args.eval_to, matches[-1].date), fit_info)
     print("\n" + report)
     if args.output:

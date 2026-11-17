@@ -1,0 +1,41 @@
+{
+  "period": "20240101-20260525",
+  "families": {
+    "total_breaks": {
+      "count": 5747,
+      "mean_predicted": 0.826,
+      "hit_rate": 0.8131,
+      "gap": -0.0129
+    },
+    "player_breaks": {
+      "count": 11411,
+      "mean_predicted": 0.813,
+      "hit_rate": 0.8019,
+      "gap": -0.011
+    },
+    "first_set_tiebreak": {
+      "count": 5735,
+      "mean_predicted": 0.7979,
+      "hit_rate": 0.7965,
+      "gap": -0.0014
+    },
+    "player_games": {
+      "count": 11705,
+      "mean_predicted": 0.7899,
+      "hit_rate": 0.7903,
+      "gap": 0.0004
+    },
+    "first_set_games": {
+      "count": 5853,
+      "mean_predicted": 0.7908,
+      "hit_rate": 0.7871,
+      "gap": -0.0037
+    },
+    "total_games": {
+      "count": 5853,
+      "mean_predicted": 0.7727,
+      "hit_rate": 0.7724,
+      "gap": -0.0003
+    }
+  }
+}

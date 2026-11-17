@@ -187,3 +187,32 @@ def test_resolve_player_apostrophe_and_abbreviation():
     assert resolve_player(ratings, "C. O'Connell") == 1
     assert resolve_player(ratings, "Dar. Blanch") == 2
     assert resolve_player(ratings, "U. Blanch") == 3
+
+
+def test_best_predictions_use_reliable_markets_and_drive_top_pick(tmp_path):
+    from tenis_ai.reliability import compute_reliability, load_reliability, save_reliability
+    from tenis_ai.selection import best_predictions
+
+    sel = [
+        {"id": "w", "category": "Ganador", "group": "winner", "probability": 0.87},
+        {"id": "tg", "category": "Juegos", "group": "total_games", "probability": 0.80},
+        {"id": "tb", "category": "Quiebres", "group": "total_breaks", "probability": 0.82},
+        {"id": "ba", "category": "Quiebres", "group": "breaks_a", "probability": 0.81},
+    ]
+    gaps = {"total_breaks": -0.03, "player_breaks": 0.0, "total_games": 0.0}
+    best = best_predictions(sel, gaps)
+    assert [b["id"] for b in best] == ["ba", "tg", "tb"]  # sin ganador; 0.82-0.03 < 0.80
+    assert top_pick(sel, best)["id"] == "ba"
+    assert top_pick(sel)["id"] == "w"  # sin mejores predicciones: la más probable
+    priced = [dict(sel[1], edge=0.05, odds=1.31)] + sel[2:]
+    assert top_pick(priced, best_predictions(priced, gaps))["id"] == "tg"  # con cuota manda el EV
+
+    fams = compute_reliability({
+        "breaks_a": {"count": 100, "mean_predicted": 0.8, "hit_rate": 0.78},
+        "breaks_b": {"count": 300, "mean_predicted": 0.8, "hit_rate": 0.80},
+        "winner": {"count": 50, "mean_predicted": 0.7, "hit_rate": 0.7},
+    })
+    assert set(fams) == {"player_breaks"} and fams["player_breaks"]["gap"] == pytest.approx(-0.005)
+    path = save_reliability(fams, "test", tmp_path / "rel.json")
+    assert load_reliability(path)["player_breaks"] == pytest.approx(-0.005)
+    assert load_reliability(tmp_path / "missing.json")["total_games"] == 0.0
