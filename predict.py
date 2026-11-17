@@ -18,12 +18,13 @@ if hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 from tenis_ai.engine import TennisEngine, parse_matchup  # noqa: E402
+from tenis_ai.history import HistoryStore  # noqa: E402
 from tenis_ai.players import PlayerNotFound  # noqa: E402
 
 GRAND_SLAMS = ("australian open", "roland garros", "french open", "wimbledon", "us open")
 
 
-def run_today(engine: TennisEngine, day: str, default_surface: str) -> int:
+def run_today(engine: TennisEngine, day: str, default_surface: str, store: HistoryStore | None) -> int:
     from tenis_ai.data.api_tennis import ApiTennisClient, ApiTennisError
 
     errors: list[str] = []
@@ -45,6 +46,7 @@ def run_today(engine: TennisEngine, day: str, default_surface: str) -> int:
         print(f"No hay partidos ATP individuales el {day} en api-tennis.com.")
         return 0
     print(f"Partidos ATP del {day}: {len(fixtures)}\n")
+    saved = 0
     for fx in fixtures:
         if fx.started:
             errors.append(
@@ -65,6 +67,11 @@ def run_today(engine: TennisEngine, day: str, default_surface: str) -> int:
             errors.append(f"{fx.player_a} vs {fx.player_b}: {exc}")
             continue
         print(report.markdown + "\n\n---\n")
+        if store is not None:
+            store.save_prediction(report, fx.date or day, fx.tournament, fx.event_key, source="today")
+            saved += 1
+    if store is not None and saved:
+        print(f"📒 {saved} predicciones guardadas en el histórico ({store.path.name}).", file=sys.stderr)
     if errors:
         print("## ⚠️ Incidencias")
         for err in errors:
@@ -78,9 +85,12 @@ def main() -> None:
     parser.add_argument("--surface", default="Hard", choices=["Hard", "Clay", "Grass"])
     parser.add_argument("--best-of", type=int, default=3, choices=[3, 5])
     parser.add_argument("--today", action="store_true", help="Analiza el calendario ATP del día (requiere API_TENNIS_KEY)")
-    parser.add_argument("--date", default=date.today().isoformat(), help="Fecha AAAA-MM-DD para --today")
+    parser.add_argument("--date", default=date.today().isoformat(), help="Fecha del partido AAAA-MM-DD")
+    parser.add_argument("--tournament", default="", help="Torneo (se guarda en el histórico)")
+    parser.add_argument("--no-save", action="store_true", help="No guardar la predicción en el histórico")
     args = parser.parse_args()
 
+    store = None if args.no_save else HistoryStore()
     engine = TennisEngine()
     if engine.data_age_days > 45:
         print(
@@ -89,12 +99,16 @@ def main() -> None:
             file=sys.stderr,
         )
     if args.today:
-        sys.exit(run_today(engine, args.date, args.surface))
+        sys.exit(run_today(engine, args.date, args.surface, store))
     if not args.query:
         parser.error("Indica un partido ('Alcaraz vs Sinner') o usa --today.")
     try:
         a, b = parse_matchup(" ".join(args.query))
-        print(engine.report(a, b, args.surface, args.best_of).markdown)
+        report = engine.report(a, b, args.surface, args.best_of)
+        print(report.markdown)
+        if store is not None:
+            store.save_prediction(report, args.date, args.tournament, source="manual")
+            print(f"\n📒 Predicción guardada en el histórico ({store.path.name}).", file=sys.stderr)
     except (ValueError, PlayerNotFound) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(3)

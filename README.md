@@ -36,6 +36,18 @@ python predict.py --today --date 2026-11-18
 
 `--today` primero actualiza el Elo con los resultados ATP desde el final del histórico hasta ayer, luego trae los partidos del día y las cuotas de ganador (mediana de las casas), y genera un reporte por partido. La superficie se deduce del torneo y al mejor de 5 se aplica en Grand Slams. Las incidencias (jugadores sin historial, torneos sin superficie conocida) se listan al final.
 
+## Histórico de predicciones
+
+Cada predicción (manual o `--today`) se guarda automáticamente en `history/predictions.jsonl`: jugadores, fecha, torneo, probabilidad de victoria y todas las selecciones mostradas con su cuota y EV. Ese archivo está dentro del repositorio para que no se pierda (las sesiones en la nube son temporales).
+
+```bash
+python track.py settle   # busca en api-tennis.com el resultado real de cada predicción pendiente
+python track.py report   # aciertos por categoría, calibración (dijo X % → pasó Y %), ROI con cuota
+python track.py sync     # commit + push del histórico a main
+```
+
+Se comprueban ganador, sets, juegos y tie-breaks. Los quiebres quedan sin comprobar, porque api-tennis.com no trae estadísticas de saque. Los partidos con retiro o walkover cuentan como nulos. Si un partido se vuelve a predecir antes de empezar, se guarda la última versión; una vez comprobado ya no se modifica.
+
 ## Modelo
 
 - **Elo** global y por superficie, K = 250/(n+5)^0.4, mezcla 50/50 global/superficie (ajustada).

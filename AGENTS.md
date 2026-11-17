@@ -15,6 +15,12 @@ Cuando el usuario pida analizar un partido de tenis o los partidos del día (por
 3. **Muestra directamente el reporte del comando.** No inventes ni recalcules probabilidades, líneas ni cuotas.
 4. Si el comando muestra "⚠️ Incidencias" o avisos de datos antiguos, inclúyelos al final.
 
+## 📒 Histórico de predicciones (obligatorio)
+- `predict.py` guarda automáticamente cada predicción en `history/predictions.jsonl` (no usar `--no-save` salvo pruebas).
+- **Después de cada predicción**, subir el histórico: `python track.py sync` (commit y push a `main`). Las sesiones en la nube son temporales: lo que no se sube se pierde.
+- Para comprobar con los resultados reales: `python track.py settle`, luego `python track.py report` y `python track.py sync`.
+- Al empezar una sesión nueva, ejecutar primero `python track.py settle` para liquidar lo pendiente.
+
 ## ⛔ Reglas de presentación (las aplica el código)
 1. Solo selecciones entre **60.0 % y 88.0 %**.
 2. **Sin hándicaps** de juegos ni de sets.

@@ -93,6 +93,10 @@ class ApiTennisClient:
             )
         return fixtures
 
+    def raw_fixtures(self, date_start: str, date_stop: str) -> list[dict[str, Any]]:
+        """Eventos tal como los devuelve la API (todas las categorías) entre dos fechas."""
+        return list(self._get("get_fixtures", date_start=date_start, date_stop=date_stop) or [])
+
     def finished_atp_results(self, date_start: str, date_stop: str) -> list[dict[str, Any]]:
         """Resultados ATP individuales terminados entre dos fechas (para actualizar el Elo).
 
