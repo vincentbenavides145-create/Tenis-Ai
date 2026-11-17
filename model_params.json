@@ -1,0 +1,14 @@
+{
+  "elo_k_scale": 1.0,
+  "elo_surface_weight": 0.5,
+  "elo_weight": 0.5,
+  "half_life_days": 120.0,
+  "cross_surface_weight": 0.5,
+  "prior_points": 400.0,
+  "form_sd": 0.035,
+  "fitted": true,
+  "sample_size": 17382,
+  "log_loss": 0.60813,
+  "baseline_log_loss": 0.60965,
+  "fitted_at": "2026-11-17T13:41:45+00:00"
+}
