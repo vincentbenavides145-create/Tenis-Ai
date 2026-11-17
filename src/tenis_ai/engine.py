@@ -45,6 +45,8 @@ class TennisEngine:
         self.surfaces = latest_surface_by_tournament(self.matches)
         last = self.matches[-1].date if self.matches else "19700101"
         self.data_end = date(int(last[:4]), int(last[4:6]), int(last[6:8]))
+        # Fin del histórico con estadísticas de saque (no cambia al actualizar el Elo por la API).
+        self.history_end = self.data_end
 
     @property
     def data_age_days(self) -> int:

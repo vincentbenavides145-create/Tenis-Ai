@@ -17,11 +17,36 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
+try:  # .env opcional (API_TENNIS_KEY=...); las variables de entorno ya definidas tienen prioridad
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except ImportError:
+    pass
+
 from tenis_ai.engine import TennisEngine, parse_matchup  # noqa: E402
 from tenis_ai.history import HistoryStore  # noqa: E402
 from tenis_ai.players import PlayerNotFound  # noqa: E402
 
 GRAND_SLAMS = ("australian open", "roland garros", "french open", "wimbledon", "us open")
+
+
+def warn_data_age(engine: TennisEngine) -> None:
+    """Avisa si los datos con los que se predice están desactualizados."""
+    history_age = (date.today() - engine.history_end).days
+    if engine.data_end > engine.history_end:
+        if history_age > 45:
+            print(
+                f"ℹ️ Elo actualizado con api-tennis.com hasta el {engine.data_end.isoformat()}; las estadísticas "
+                f"de saque/resto del histórico terminan el {engine.history_end.isoformat()} ({history_age} días).\n",
+                file=sys.stderr,
+            )
+    elif engine.data_age_days > 45:
+        print(
+            f"⚠️ Los datos históricos terminan el {engine.data_end.isoformat()} "
+            f"({engine.data_age_days} días). La forma reciente de los jugadores no está incluida.\n",
+            file=sys.stderr,
+        )
 
 
 def run_today(engine: TennisEngine, day: str, default_surface: str, store: HistoryStore | None) -> int:
@@ -36,6 +61,7 @@ def run_today(engine: TennisEngine, day: str, default_surface: str, store: Histo
             print(f"  {added} partidos añadidos; {len(issues)} con jugadores sin historial.\n", file=sys.stderr)
         else:
             issues = []
+        warn_data_age(engine)
         fixtures = client.atp_singles_fixtures(day)
     except ApiTennisError as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -92,14 +118,9 @@ def main() -> None:
 
     store = None if args.no_save else HistoryStore()
     engine = TennisEngine()
-    if engine.data_age_days > 45:
-        print(
-            f"⚠️ Los datos históricos terminan el {engine.data_end.isoformat()} "
-            f"({engine.data_age_days} días). La forma reciente de los jugadores no está incluida.\n",
-            file=sys.stderr,
-        )
     if args.today:
         sys.exit(run_today(engine, args.date, args.surface, store))
+    warn_data_age(engine)
     if not args.query:
         parser.error("Indica un partido ('Alcaraz vs Sinner') o usa --today.")
     try:

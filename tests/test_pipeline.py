@@ -173,3 +173,17 @@ def test_api_key_alternative_name(monkeypatch):
     monkeypatch.delenv("API_TENNIS_KEY", raising=False)
     monkeypatch.setenv("API_TENIS_KEY", "abc")
     assert ApiTennisClient().api_key == "abc"
+
+
+def test_resolve_player_apostrophe_and_abbreviation():
+    from types import SimpleNamespace
+
+    players = {
+        1: SimpleNamespace(name="Christopher Oconnell", last_date="20260330", matches=159),
+        2: SimpleNamespace(name="Darwin Blanch", last_date="20260318", matches=7),
+        3: SimpleNamespace(name="Ulises Blanch", last_date="20200831", matches=1),
+    }
+    ratings = SimpleNamespace(players=players)
+    assert resolve_player(ratings, "C. O'Connell") == 1
+    assert resolve_player(ratings, "Dar. Blanch") == 2
+    assert resolve_player(ratings, "U. Blanch") == 3
