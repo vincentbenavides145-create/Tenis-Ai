@@ -1,0 +1,94 @@
+"""Predicciones ATP de Tenis-AI.
+
+    python predict.py "Alcaraz vs Sinner" --surface Hard            # partido manual
+    python predict.py "Alcaraz vs Sinner" --surface Clay --best-of 5
+    python predict.py --today                                       # calendario ATP de hoy (api-tennis.com)
+    python predict.py --today --date 2026-11-17
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from datetime import date
+from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
+from tenis_ai.engine import TennisEngine, parse_matchup  # noqa: E402
+from tenis_ai.players import PlayerNotFound  # noqa: E402
+
+GRAND_SLAMS = ("australian open", "roland garros", "french open", "wimbledon", "us open")
+
+
+def run_today(engine: TennisEngine, day: str, default_surface: str) -> int:
+    from tenis_ai.data.api_tennis import ApiTennisClient, ApiTennisError
+
+    errors: list[str] = []
+    try:
+        client = ApiTennisClient()
+        if engine.data_age_days > 1:
+            print(f"Actualizando Elo con resultados ATP desde {engine.data_end.isoformat()} (api-tennis.com)...", file=sys.stderr)
+            added, issues = engine.update_from_api(client)
+            print(f"  {added} partidos añadidos; {len(issues)} con jugadores sin historial.\n", file=sys.stderr)
+        fixtures = client.atp_singles_fixtures(day)
+    except ApiTennisError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    if not fixtures:
+        print(f"No hay partidos ATP individuales el {day} en api-tennis.com.")
+        return 0
+    print(f"Partidos ATP del {day}: {len(fixtures)}\n")
+    for fx in fixtures:
+        surface = engine.guess_surface(fx.tournament)
+        note = fx.tournament + (f" · {fx.round}" if fx.round else "") + (f" · {fx.time}" if fx.time else "")
+        if surface is None:
+            surface = default_surface
+            errors.append(f"{fx.player_a} vs {fx.player_b}: superficie desconocida para '{fx.tournament}', se usó {surface}.")
+        best_of = 5 if any(s in fx.tournament.lower() for s in GRAND_SLAMS) else 3
+        odds = client.match_winner_odds(fx.event_key)
+        try:
+            report = engine.report(fx.player_a, fx.player_b, surface, best_of, odds=odds, header_note=note)
+        except PlayerNotFound as exc:
+            errors.append(f"{fx.player_a} vs {fx.player_b}: {exc}")
+            continue
+        print(report.markdown + "\n\n---\n")
+    if errors:
+        print("## ⚠️ Incidencias")
+        for err in errors:
+            print(f"- {err}")
+    return 0
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Predicciones ATP de Tenis-AI")
+    parser.add_argument("query", nargs="*", help="'Jugador A vs Jugador B'")
+    parser.add_argument("--surface", default="Hard", choices=["Hard", "Clay", "Grass"])
+    parser.add_argument("--best-of", type=int, default=3, choices=[3, 5])
+    parser.add_argument("--today", action="store_true", help="Analiza el calendario ATP del día (requiere API_TENNIS_KEY)")
+    parser.add_argument("--date", default=date.today().isoformat(), help="Fecha AAAA-MM-DD para --today")
+    args = parser.parse_args()
+
+    engine = TennisEngine()
+    if engine.data_age_days > 45:
+        print(
+            f"⚠️ Los datos históricos terminan el {engine.data_end.isoformat()} "
+            f"({engine.data_age_days} días). La forma reciente de los jugadores no está incluida.\n",
+            file=sys.stderr,
+        )
+    if args.today:
+        sys.exit(run_today(engine, args.date, args.surface))
+    if not args.query:
+        parser.error("Indica un partido ('Alcaraz vs Sinner') o usa --today.")
+    try:
+        a, b = parse_matchup(" ".join(args.query))
+        print(engine.report(a, b, args.surface, args.best_of).markdown)
+    except (ValueError, PlayerNotFound) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(3)
+
+
+if __name__ == "__main__":
+    main()

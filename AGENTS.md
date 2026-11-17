@@ -1,0 +1,29 @@
+# Reglas de Pronósticos de Tenis (TENIS-AI, ATP)
+
+Cuando el usuario pida analizar un partido de tenis o los partidos del día (por ejemplo: "Analiza Alcaraz vs Sinner", "¿quién gana hoy en el ATP?"):
+
+## 🎯 Flujo obligatorio
+1. Partido concreto:
+   ```bash
+   python predict.py "<Jugador A> vs <Jugador B>" --surface <Hard|Clay|Grass> [--best-of 5]
+   ```
+   Si el usuario no indica la superficie, pregúntala o dedúcela del torneo. Al mejor de 5 solo en Grand Slams.
+2. Partidos del día (requiere `API_TENNIS_KEY`):
+   ```bash
+   python predict.py --today [--date AAAA-MM-DD]
+   ```
+3. **Muestra directamente el reporte del comando.** No inventes ni recalcules probabilidades, líneas ni cuotas.
+4. Si el comando muestra "⚠️ Incidencias" o avisos de datos antiguos, inclúyelos al final.
+
+## ⛔ Reglas de presentación (las aplica el código)
+1. Solo selecciones entre **60.0 % y 88.0 %**.
+2. **Sin hándicaps** de juegos ni de sets.
+3. **Una sola selección por mercado** (p. ej. una única línea de juegos totales) y **máximo 4 por categoría**, de mayor a menor probabilidad.
+4. Con cuotas: **EV = probabilidad × cuota − 1**; se descarta lo que tenga EV < +3 % y se elige la de mayor EV. El Pick Recomendado es la de mayor EV.
+5. Sin tablas, sin "mercados a evitar", sin variables internas del modelo, sin etiquetas de nivel.
+6. Una justificación de **una sola línea** por selección, empezando con *Porque ...*.
+7. Categorías vacías no se muestran.
+
+## 🧪 Validación
+- Cambios en el modelo: ejecutar `pytest` y `python backtest.py` y comparar Brier/log-loss del ganador y la calibración de lo mostrado.
+- Los parámetros se ajustan con `python backtest.py --fit --save-params` (ajuste 2016–2023, evaluación fuera de muestra 2024+).
